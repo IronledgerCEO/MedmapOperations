@@ -45,8 +45,13 @@ export type CurrentEmployeeState = {
   error: Error | null;
 };
 
+export type OrganizationRecord = {
+  id: string;
+  name: string | null;
+};
+
 export type CurrentOrganisationState = {
-  organization: Record<string, unknown> | null;
+  organization: OrganizationRecord | null;
   organizationId: string | null;
   status: "loading" | "unauthenticated" | "active" | "no-organization" | "error";
   isLoading: boolean;
@@ -78,6 +83,24 @@ const employeeColumns = [
 
 function asError(error: unknown) {
   return error instanceof Error ? error : new Error("The identity lookup could not be completed.");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseOrganizationRecord(value: unknown, organizationId: string): OrganizationRecord {
+  if (!isRecord(value)) throw new Error("The organisation record is not an object.");
+  const id = value.id;
+  const name = value.name;
+  if (typeof id !== "string" || id !== organizationId) {
+    throw new Error("The organisation record ID does not match the resolved organisation.");
+  }
+  if (name === null) return { id, name: null };
+  if (typeof name !== "string") {
+    throw new Error("The organisation name has an invalid type.");
+  }
+  return { id, name };
 }
 
 export function useCurrentEmployee(): CurrentEmployeeState {
@@ -193,16 +216,21 @@ export function useCurrentOrganisation(): CurrentOrganisationState {
       const client = getSupabaseClient();
       const { data: organizationId, error: organizationIdError } = await client.rpc("current_organization_id");
       if (organizationIdError) throw organizationIdError;
-      if (!organizationId) return null;
+      if (organizationId === null) return null;
+      if (typeof organizationId !== "string" || !organizationId.trim()) {
+        throw new Error("The resolved organisation ID is invalid.");
+      }
 
       const { data, error } = await client
         .from("organizations")
-        .select("*")
+        .select("id, name")
         .eq("id", organizationId)
         .maybeSingle();
 
       if (error) throw error;
-      return { id: organizationId as string, record: (data as Record<string, unknown> | null) ?? null };
+      if (!data) return null;
+      const record = parseOrganizationRecord(data, organizationId);
+      return { id: record.id, record };
     },
   });
 

@@ -90,22 +90,154 @@ const columns = {
   departments: "id, code, name, active, department_group",
 } as const;
 
-function parseDoctorAcquisition(
-  row: DoctorAcquisitionRow,
-): DoctorAcquisitionRow {
-  return row;
+type UnknownRecord = Record<string, unknown>;
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseDoctor(row: DoctorProfile): DoctorProfile {
-  return row;
+function asRecord(value: unknown): UnknownRecord {
+  if (!isRecord(value)) throw new Error("The response row is not an object.");
+  return value;
 }
 
-function parseEmployee(row: AcquisitionEmployee): AcquisitionEmployee {
-  return row;
+function requiredString(row: UnknownRecord, field: string): string {
+  const value = row[field];
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`The ${field} field is invalid.`);
+  }
+  return value;
 }
 
-function parseDepartment(row: AcquisitionDepartment): AcquisitionDepartment {
-  return row;
+function nullableString(row: UnknownRecord, field: string): string | null {
+  const value = row[field];
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") throw new Error(`The ${field} field is invalid.`);
+  return value;
+}
+
+function requiredUuid(row: UnknownRecord, field: string): string {
+  const value = requiredString(row, field);
+  if (!uuidPattern.test(value)) throw new Error(`The ${field} field is invalid.`);
+  return value;
+}
+
+function nullableUuid(row: UnknownRecord, field: string): string | null {
+  const value = nullableString(row, field);
+  if (value === null) return null;
+  if (!uuidPattern.test(value)) throw new Error(`The ${field} field is invalid.`);
+  return value;
+}
+
+function normalizeTimestamp(row: UnknownRecord, field: string): string {
+  const value = requiredString(row, field);
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) throw new Error(`The ${field} field is invalid.`);
+  return date.toISOString();
+}
+
+function nullableTimestamp(row: UnknownRecord, field: string): string | null {
+  const value = nullableString(row, field);
+  if (value === null) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) throw new Error(`The ${field} field is invalid.`);
+  return date.toISOString();
+}
+
+function nullableDate(row: UnknownRecord, field: string): string | null {
+  const value = nullableString(row, field);
+  if (value === null) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`The ${field} field is invalid.`);
+  }
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== value) {
+    throw new Error(`The ${field} field is invalid.`);
+  }
+  return value;
+}
+
+function requiredBoolean(row: UnknownRecord, field: string): boolean {
+  const value = row[field];
+  if (typeof value !== "boolean") throw new Error(`The ${field} field is invalid.`);
+  return value;
+}
+
+function parseDoctorAcquisition(row: unknown): DoctorAcquisitionRow {
+  const record = asRecord(row);
+  return {
+    id: requiredUuid(record, "id"),
+    doctor_id: requiredUuid(record, "doctor_id"),
+    department_id: nullableUuid(record, "department_id"),
+    owner_employee_id: nullableUuid(record, "owner_employee_id"),
+    acquisition_channel: nullableString(record, "acquisition_channel"),
+    source_detail: nullableString(record, "source_detail"),
+    status: requiredString(record, "status"),
+    contacted_at: nullableTimestamp(record, "contacted_at"),
+    enrolled_at: nullableTimestamp(record, "enrolled_at"),
+    converted_at: nullableTimestamp(record, "converted_at"),
+    lost_at: nullableTimestamp(record, "lost_at"),
+    notes: nullableString(record, "notes"),
+    created_at: normalizeTimestamp(record, "created_at"),
+    updated_at: normalizeTimestamp(record, "updated_at"),
+  };
+}
+
+function parseDoctor(row: unknown): DoctorProfile {
+  const record = asRecord(row);
+  return {
+    id: requiredUuid(record, "id"),
+    first_name: requiredString(record, "first_name"),
+    last_name: requiredString(record, "last_name"),
+    practice_name: nullableString(record, "practice_name"),
+    specialty: nullableString(record, "specialty"),
+    city: nullableString(record, "city"),
+    province: nullableString(record, "province"),
+    acquisition_source: nullableString(record, "acquisition_source"),
+    acquisition_status: requiredString(record, "acquisition_status"),
+    onboarding_date: nullableDate(record, "onboarding_date"),
+    probation_start_date: nullableDate(record, "probation_start_date"),
+    probation_end_date: nullableDate(record, "probation_end_date"),
+    first_1000_campaign: requiredBoolean(record, "first_1000_campaign"),
+    active: requiredBoolean(record, "active"),
+    created_at: normalizeTimestamp(record, "created_at"),
+    updated_at: normalizeTimestamp(record, "updated_at"),
+  };
+}
+
+function parseEmployee(row: unknown): AcquisitionEmployee {
+  const record = asRecord(row);
+  return {
+    id: requiredUuid(record, "id"),
+    first_name: requiredString(record, "first_name"),
+    last_name: requiredString(record, "last_name"),
+    email: nullableString(record, "email"),
+    department_id: nullableUuid(record, "department_id"),
+    job_title: nullableString(record, "job_title"),
+    employee_status: requiredString(record, "employee_status"),
+  };
+}
+
+function parseDepartment(row: unknown): AcquisitionDepartment {
+  const record = asRecord(row);
+  return {
+    id: requiredUuid(record, "id"),
+    code: requiredString(record, "code"),
+    name: requiredString(record, "name"),
+    active: requiredBoolean(record, "active"),
+    department_group: requiredString(record, "department_group"),
+  };
+}
+
+function normalizeRows<T>(value: unknown, parser: (row: unknown) => T, label: string): T[] {
+  if (!Array.isArray(value)) throw new Error(`The ${label} response is invalid.`);
+  try {
+    return value.map(parser);
+  } catch {
+    throw new Error(`The ${label} response contains malformed records.`);
+  }
 }
 
 async function fetchDoctorAcquisitionDashboard(
@@ -142,17 +274,25 @@ async function fetchDoctorAcquisitionDashboard(
   if (employeesResponse.error) throw employeesResponse.error;
   if (departmentsResponse.error) throw departmentsResponse.error;
 
-  const acquisitions = (acquisitionResponse.data ?? []).map((row) =>
-    parseDoctorAcquisition(row as unknown as DoctorAcquisitionRow),
+  const acquisitions = normalizeRows(
+    acquisitionResponse.data ?? [],
+    parseDoctorAcquisition,
+    "doctor acquisition",
   );
-  const doctors = (doctorsResponse.data ?? []).map((row) =>
-    parseDoctor(row as unknown as DoctorProfile),
+  const doctors = normalizeRows(
+    doctorsResponse.data ?? [],
+    parseDoctor,
+    "doctor",
   );
-  const employees = (employeesResponse.data ?? []).map((row) =>
-    parseEmployee(row as unknown as AcquisitionEmployee),
+  const employees = normalizeRows(
+    employeesResponse.data ?? [],
+    parseEmployee,
+    "employee",
   );
-  const departments = (departmentsResponse.data ?? []).map((row) =>
-    parseDepartment(row as unknown as AcquisitionDepartment),
+  const departments = normalizeRows(
+    departmentsResponse.data ?? [],
+    parseDepartment,
+    "department",
   );
   const doctorById = new Map(doctors.map((doctor) => [doctor.id, doctor]));
   const employeeById = new Map(
