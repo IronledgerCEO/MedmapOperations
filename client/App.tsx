@@ -16,6 +16,7 @@ import Operations from "./pages/Operations";
 import DoctorAcquisition from "./pages/DoctorAcquisition";
 import Ambassadors from "./pages/Ambassadors";
 import Sales from "./pages/Sales";
+import CustomerOperations from "./pages/CustomerOperations";
 import Meetings from "./pages/Meetings";
 import KPIs from "./pages/KPIs";
 import ModulePage from "./pages/ModulePage";
@@ -51,7 +52,7 @@ const App = () => (
                 <Route path="/sales" element={<Sales />} />
                 <Route
                   path="/customer-operations"
-                  element={<ModulePage module="customer-operations" />}
+                  element={<CustomerOperations />}
                 />
                 <Route
                   path="/technology"
