@@ -31,6 +31,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return <IdentityState title="Organisation access required" message="Your active employee profile is not associated with an organisation." />;
   }
 
+  // This gate establishes authentication and organisation context; module permissions remain a separate authorization concern.
   return <>{children}</>;
 }
 

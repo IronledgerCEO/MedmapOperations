@@ -1,20 +1,34 @@
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   CalendarDays,
+  CheckCircle2,
+  CircleDot,
+  Clock3,
+  Mail,
   MapPin,
+  Phone,
   Stethoscope,
   Target,
+  Ticket,
   Users,
 } from "lucide-react";
 import { AppShell } from "@/components/medmap/AppShell";
 import {
+  buildAcquisitionKpiInformation,
+  buildAcquisitionOperationalSummary,
+  buildAcquisitionTimeline,
   buildDoctorAcquisitionMetrics,
   displayDoctorName,
   displayEmployeeName,
   sortRecentAcquisitions,
   useDoctorAcquisitionDashboard,
   type AcquisitionBreakdown,
+  type AcquisitionChannelSummary,
+  type AcquisitionKpiInformation,
+  type AcquisitionOwnerWorkload,
+  type AcquisitionTimelineItem,
   type DoctorAcquisitionRecord,
 } from "@/lib/doctor-acquisition-dashboard";
 import { cn } from "@/lib/utils";
@@ -31,24 +45,46 @@ function formatLiveDate(value: string | null) {
       }).format(date);
 }
 
+function formatPercent(value: number | null) {
+  return value === null ? "—" : `${value.toFixed(1)}%`;
+}
+
+function formatKpiValue(value: number | null, unit: string | null) {
+  if (value === null) return "Unavailable";
+  return `${value}${unit ? ` ${unit}` : ""}`;
+}
+
 function statusClass(status: string) {
   const value = status.trim().toLowerCase();
   if (
-    ["converted", "enrolled", "active", "complete", "completed"].includes(value)
+    ["converted", "enrolled", "active", "complete", "completed", "resolved"].includes(
+      value,
+    )
   ) {
     return "bg-[#e8f8f2] text-[#168465]";
   }
   if (["lost", "inactive", "closed", "cancelled", "canceled"].includes(value)) {
     return "bg-[#ffe5e3] text-[#bd504d]";
   }
-  if (["contacted", "in progress", "assigned"].includes(value)) {
+  if (["contacted", "in progress", "assigned", "open"].includes(value)) {
     return "bg-[#f1edff] text-[#755bc0]";
   }
   return "bg-[#fff2d9] text-[#9a6419]";
 }
 
-function formatPercent(value: number | null) {
-  return value === null ? "—" : `${value.toFixed(1)}%`;
+function isResolvedStatus(status: string) {
+  return [
+    "completed",
+    "complete",
+    "closed",
+    "done",
+    "resolved",
+    "remediated",
+    "cancelled",
+    "canceled",
+    "expired",
+    "dismissed",
+  ].includes(status.trim().toLowerCase().replace(/[_-]+/g, " "));
 }
 
 function StateMessage({
@@ -56,7 +92,7 @@ function StateMessage({
   tone = "empty",
 }: {
   children: React.ReactNode;
-  tone?: "empty" | "error";
+  tone?: "empty" | "error" | "warning";
 }) {
   return (
     <p
@@ -64,7 +100,9 @@ function StateMessage({
         "rounded-xl p-3 text-[11px] leading-5",
         tone === "error"
           ? "border border-[#f0cdca] bg-[#fff8f7] text-[#a34f4b]"
-          : "bg-[#f7f9fb] text-slate-400",
+          : tone === "warning"
+            ? "border border-[#f4dfb3] bg-[#fffaf0] text-[#94651d]"
+            : "bg-[#f7f9fb] text-slate-400",
       )}
     >
       {children}
@@ -72,9 +110,80 @@ function StateMessage({
   );
 }
 
+function Metric({
+  label,
+  value,
+  detail,
+  tone,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone: "mint" | "blue" | "amber" | "red" | "purple";
+  icon: typeof Activity;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_5px_20px_rgba(21,36,58,0.035)]">
+      <span
+        className={cn(
+          "grid size-9 place-items-center rounded-xl",
+          tone === "mint" && "bg-[#e8f8f2] text-[#1b9975]",
+          tone === "blue" && "bg-[#eaf3ff] text-[#4a87c9]",
+          tone === "amber" && "bg-[#fff2d9] text-[#b3781f]",
+          tone === "red" && "bg-[#ffe9e6] text-[#bf5b56]",
+          tone === "purple" && "bg-[#f1edff] text-[#755bc0]",
+        )}
+      >
+        <Icon size={17} />
+      </span>
+      <p className="mt-4 text-[11px] font-medium text-slate-500">{label}</p>
+      <p className="mt-1 font-display text-[26px] font-bold tracking-[-0.06em] text-[#152239]">
+        {value}
+      </p>
+      <p className="mt-1 text-[10px] text-slate-400">{detail}</p>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  description,
+  icon: Icon,
+  children,
+  className,
+}: {
+  title: string;
+  description: string;
+  icon: typeof Activity;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6",
+        className,
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#eaf3ff] text-[#4a87c9]">
+          <Icon size={16} />
+        </span>
+        <div>
+          <h2 className="font-display text-[16px] font-bold text-[#152239]">
+            {title}
+          </h2>
+          <p className="mt-1 text-[11px] leading-5 text-slate-400">{description}</p>
+        </div>
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
 function BreakdownList({ rows }: { rows: AcquisitionBreakdown[] }) {
-  if (!rows.length)
-    return <StateMessage>No live values are available.</StateMessage>;
+  if (!rows.length) return <StateMessage>No live values are available.</StateMessage>;
   return (
     <div className="space-y-2">
       {rows.slice(0, 8).map((row) => (
@@ -94,351 +203,334 @@ function BreakdownList({ rows }: { rows: AcquisitionBreakdown[] }) {
   );
 }
 
-function Metric({
-  label,
-  value,
-  detail,
-  tone,
-  icon: Icon,
+function ChannelTable({ channels }: { channels: AcquisitionChannelSummary[] }) {
+  if (!channels.length) return <StateMessage>No channel data is available.</StateMessage>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[620px] text-left text-[10px]">
+        <thead className="text-[9px] uppercase tracking-[0.12em] text-slate-400">
+          <tr>
+            <th className="pb-2 font-bold">Channel</th>
+            <th className="pb-2 text-right font-bold">Records</th>
+            <th className="pb-2 text-right font-bold">Contacted</th>
+            <th className="pb-2 text-right font-bold">Enrolled</th>
+            <th className="pb-2 text-right font-bold">Converted</th>
+            <th className="pb-2 text-right font-bold">Lost</th>
+            <th className="pb-2 text-right font-bold">Conversion</th>
+          </tr>
+        </thead>
+        <tbody>
+          {channels.slice(0, 8).map((channel) => (
+            <tr key={channel.label} className="border-t border-slate-100">
+              <td className="max-w-[180px] truncate py-3 font-semibold text-slate-600">
+                {channel.label}
+              </td>
+              <td className="py-3 text-right font-bold text-[#152239]">{channel.recordCount}</td>
+              <td className="py-3 text-right text-slate-500">{channel.contactedCount}</td>
+              <td className="py-3 text-right text-slate-500">{channel.enrolledCount}</td>
+              <td className="py-3 text-right text-slate-500">{channel.convertedCount}</td>
+              <td className="py-3 text-right text-slate-500">{channel.lostCount}</td>
+              <td className="py-3 text-right font-semibold text-[#168465]">
+                {formatPercent(channel.conversionRate)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function OwnerCard({ owner }: { owner: AcquisitionOwnerWorkload }) {
+  return (
+    <div className="rounded-xl bg-[#f7f9fb] p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-bold text-slate-700">{owner.name}</p>
+          <p className="mt-1 truncate text-[10px] text-slate-400">
+            {owner.jobTitle || "Acquisition owner"}
+          </p>
+        </div>
+        <span className="font-display text-[19px] font-bold text-[#152239]">{owner.count}</span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-slate-400">
+        <span>{owner.prospectsCount} prospects</span>
+        <span>{owner.contactedCount} contacted</span>
+        <span>{owner.convertedCount} converted</span>
+      </div>
+      <p className="mt-2 text-[10px] text-slate-400">
+        {owner.statuses.map((status) => `${status.label}: ${status.count}`).join(" · ")}
+      </p>
+    </div>
+  );
+}
+
+function CampaignSummary({
+  total,
+  active,
+  acquisitions,
+  enrolled,
+  converted,
+  notMarked,
 }: {
-  label: string;
-  value: string;
-  detail: string;
-  tone: "mint" | "blue" | "amber" | "red";
-  icon: typeof Activity;
+  total: number;
+  active: number;
+  acquisitions: number;
+  enrolled: number;
+  converted: number;
+  notMarked: number;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_5px_20px_rgba(21,36,58,0.035)]">
-      <span
-        className={cn(
-          "grid size-9 place-items-center rounded-xl",
-          tone === "mint" && "bg-[#e8f8f2] text-[#1b9975]",
-          tone === "blue" && "bg-[#eaf3ff] text-[#4a87c9]",
-          tone === "amber" && "bg-[#fff2d9] text-[#b3781f]",
-          tone === "red" && "bg-[#ffe9e6] text-[#bf5b56]",
-        )}
-      >
-        <Icon size={17} />
-      </span>
-      <p className="mt-4 text-[11px] font-medium text-slate-500">{label}</p>
-      <p className="mt-1 font-display text-[26px] font-bold tracking-[-0.06em] text-[#152239]">
-        {value}
-      </p>
-      <p className="mt-1 text-[10px] text-slate-400">{detail}</p>
+    <div className="grid grid-cols-2 gap-2">
+      {[
+        ["Campaign doctors", total],
+        ["Active doctors", active],
+        ["Acquisition records", acquisitions],
+        ["Enrolled records", enrolled],
+        ["Converted records", converted],
+        ["Not marked", notMarked],
+      ].map(([label, value]) => (
+        <div key={label} className="rounded-xl bg-[#f7f9fb] px-3 py-3">
+          <p className="text-[10px] leading-4 text-slate-500">{label}</p>
+          <strong className="mt-1 block font-display text-[21px] text-[#152239]">{value}</strong>
+        </div>
+      ))}
     </div>
   );
 }
 
-function ActivityRow({ record }: { record: DoctorAcquisitionRecord }) {
+function DoctorRow({ record }: { record: DoctorAcquisitionRecord }) {
   const doctor = record.doctor;
   return (
-    <div className="grid gap-2 rounded-xl border border-slate-100 bg-[#f8fafc] p-3 sm:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_auto] sm:items-center">
-      <div className="min-w-0">
-        <p className="truncate text-[11px] font-bold text-slate-700">
-          {displayDoctorName(doctor)}
+    <tr className="border-t border-slate-100 align-top">
+      <td className="py-3 pr-4">
+        <p className="font-bold text-slate-700">{displayDoctorName(doctor)}</p>
+        <p className="mt-1 text-slate-400">
+          {doctor?.practice_name || doctor?.specialty || "Practice details unavailable"}
         </p>
-        <p className="mt-1 truncate text-[10px] text-slate-400">
-          {doctor?.practice_name ||
-            doctor?.specialty ||
-            "Doctor profile details unavailable"}
-        </p>
-      </div>
-      <div className="min-w-0 text-[10px] text-slate-400">
-        <p className="truncate">
-          {record.acquisition_channel?.trim() || "Unknown / Unspecified"}
-        </p>
-        <p className="mt-1 truncate">{displayEmployeeName(record.owner)}</p>
-      </div>
-      <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
-        <span
-          className={cn(
-            "inline-flex rounded-full px-2 py-1 text-[10px] font-bold",
-            statusClass(record.status),
+        <div className="mt-2 flex flex-wrap gap-2 text-[9px] text-slate-400">
+          {doctor?.email && (
+            <span className="inline-flex items-center gap-1"><Mail size={11} />{doctor.email}</span>
           )}
-        >
+          {doctor?.phone && (
+            <span className="inline-flex items-center gap-1"><Phone size={11} />{doctor.phone}</span>
+          )}
+        </div>
+      </td>
+      <td className="py-3 pr-4 text-slate-500">
+        <p>{doctor?.specialty || "Specialty not provided"}</p>
+        <p className="mt-1 inline-flex items-center gap-1 text-slate-400">
+          <MapPin size={11} />{doctor?.city || doctor?.province || "Location not provided"}
+        </p>
+      </td>
+      <td className="py-3 pr-4 text-slate-500">
+        <p>{record.acquisition_channel?.trim() || "Unknown / Unspecified"}</p>
+        <p className="mt-1 text-slate-400">{record.source_detail?.trim() || "Source detail not provided"}</p>
+      </td>
+      <td className="py-3 pr-4 text-slate-500">{displayEmployeeName(record.owner)}</td>
+      <td className="py-3 pr-4">
+        <span className={cn("inline-flex rounded-full px-2 py-1 text-[9px] font-bold", statusClass(record.status))}>
           {record.status}
         </span>
-        <p className="mt-1 text-[10px] text-slate-400">
-          {formatLiveDate(record.created_at)}
+        <p className="mt-2 text-[9px] text-slate-400">
+          {doctor?.first_1000_campaign ? "First-1000" : "Standard pipeline"}
+          {doctor?.active === false ? " · Inactive doctor" : ""}
         </p>
+      </td>
+      <td className="whitespace-nowrap py-3 text-right text-slate-400">{formatLiveDate(record.updated_at)}</td>
+    </tr>
+  );
+}
+
+function TimelineRow({ item }: { item: AcquisitionTimelineItem }) {
+  return (
+    <div className="flex gap-3 border-b border-slate-100 py-3 last:border-0">
+      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[#eaf3ff] text-[#4a87c9]">
+        <CircleDot size={14} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold text-slate-700">{item.event}</p>
+        <p className="mt-1 truncate text-[10px] text-slate-400">{item.doctorName}</p>
+      </div>
+      <div className="ml-auto shrink-0 text-right">
+        <p className="text-[10px] text-slate-500">{formatLiveDate(item.occurredAt)}</p>
+        <span className={cn("mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold", statusClass(item.status))}>
+          {item.status}
+        </span>
       </div>
     </div>
   );
 }
 
-function GeographyList({ records }: { records: DoctorAcquisitionRecord[] }) {
-  const values = new Map<string, number>();
-  records.forEach((record) => {
-    const location =
-      record.doctor?.province?.trim() || record.doctor?.city?.trim();
-    if (location) values.set(location, (values.get(location) ?? 0) + 1);
-  });
-  const rows = [...values.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .sort(
-      (left, right) =>
-        right.count - left.count || left.label.localeCompare(right.label),
-    );
-  return <BreakdownList rows={rows} />;
+function KpiRow({ information }: { information: AcquisitionKpiInformation }) {
+  const target = information.target?.target_value ?? null;
+  const result = information.result?.actual_value ?? null;
+  return (
+    <div className="rounded-xl bg-[#f7f9fb] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-bold text-slate-700">{information.kpi.name}</p>
+          <p className="mt-1 text-[10px] text-slate-400">{information.kpi.code} · {information.period?.period_name || "No KPI period available"}</p>
+        </div>
+        <span className={cn("inline-flex rounded-full px-2 py-1 text-[9px] font-bold", information.result ? statusClass(information.result.status) : "bg-slate-100 text-slate-500")}>
+          {information.result ? information.result.status : "No result"}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
+        <div className="rounded-lg bg-white px-2.5 py-2">
+          <span className="block text-slate-400">Target</span>
+          <strong className="mt-1 block text-slate-700">{information.target ? formatKpiValue(target, information.kpi.unit) : "No target"}</strong>
+        </div>
+        <div className="rounded-lg bg-white px-2.5 py-2">
+          <span className="block text-slate-400">Actual result</span>
+          <strong className="mt-1 block text-slate-700">{information.result ? formatKpiValue(result, information.kpi.unit) : "No result"}</strong>
+        </div>
+      </div>
+      {information.result?.commentary && (
+        <p className="mt-2 text-[10px] leading-4 text-slate-400">{information.result.commentary}</p>
+      )}
+    </div>
+  );
 }
 
 export default function DoctorAcquisition() {
   const dashboard = useDoctorAcquisitionDashboard();
   const data = dashboard.data;
   const metrics = buildDoctorAcquisitionMetrics(data);
+  const operations = buildAcquisitionOperationalSummary(data);
+  const kpiInformation = buildAcquisitionKpiInformation(data);
+  const timeline = buildAcquisitionTimeline(data?.acquisitions ?? []);
   const recentRecords = sortRecentAcquisitions(data?.acquisitions ?? []);
+  const optionalErrors = data?.optionalErrors ?? [];
+  const tasksUnavailable = optionalErrors.some((error) => error.startsWith("task "));
+  const ticketsUnavailable = optionalErrors.some((error) => error.startsWith("ticket "));
+  const kpisUnavailable = optionalErrors.some((error) => error.startsWith("KPI"));
+  const alertsUnavailable = optionalErrors.some((error) => error.startsWith("company alert"));
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-[1440px] px-5 pb-12 pt-8 sm:px-8 xl:px-10">
+      <div className="mx-auto max-w-[1480px] px-5 pb-12 pt-8 sm:px-8 xl:px-10">
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div>
             <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.17em] text-[#b3781f]">
               <Stethoscope size={13} /> Operations · Doctor Acquisition
             </div>
-            <h1 className="max-w-[900px] font-display text-[32px] font-bold tracking-[-0.06em] text-[#152239] sm:text-[39px]">
+            <h1 className="max-w-[980px] font-display text-[32px] font-bold tracking-[-0.06em] text-[#152239] sm:text-[39px]">
               Doctor acquisition, with a source for every enrolment.
             </h1>
-            <p className="mt-2 max-w-[760px] text-[13px] leading-6 text-slate-500">
-              Live acquisition records with doctor context, channels, ownership
-              and conversion milestones from the authenticated organisation.
+            <p className="mt-2 max-w-[820px] text-[13px] leading-6 text-slate-500">
+              Live acquisition records, doctor context, ownership, operational follow-up and conversion milestones from the authenticated organisation.
             </p>
+          </div>
+          <div className="rounded-2xl border border-[#cfeee2] bg-[#f0fbf6] px-4 py-3 text-[10px] text-[#247e65]">
+            <p className="font-bold uppercase tracking-[0.12em]">Read-only command centre</p>
+            <p className="mt-1">Source records remain protected by existing Supabase RLS.</p>
           </div>
         </div>
 
         {dashboard.isPending && (
-          <div className="mt-5">
-            <StateMessage>Loading live doctor acquisition data...</StateMessage>
-          </div>
+          <div className="mt-5"><StateMessage>Loading live doctor acquisition data...</StateMessage></div>
         )}
         {dashboard.isError && (
-          <div className="mt-5">
-            <StateMessage tone="error">
-              Doctor acquisition data could not be loaded. Try again after the
-              connection is available.
-            </StateMessage>
-          </div>
+          <div className="mt-5"><StateMessage tone="error">Doctor acquisition data could not be loaded. Try again after the connection is available.</StateMessage></div>
         )}
 
         {data && !dashboard.isError && (
           <>
-            {!metrics.recordCount && (
+            {optionalErrors.length > 0 && (
               <div className="mt-5">
-                <StateMessage>No doctor acquisition records yet.</StateMessage>
+                <StateMessage tone="warning">
+                  Core acquisition data is available. Some optional panels are unavailable: {optionalErrors.join(" ")}
+                </StateMessage>
               </div>
             )}
+            {!metrics.recordCount && (
+              <div className="mt-5"><StateMessage>No doctor acquisition records yet. Related operational and KPI panels will populate when supported records exist.</StateMessage></div>
+            )}
 
-            <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Metric
-                label="Acquisition pipeline"
-                value={String(metrics.recordCount)}
-                detail={`${metrics.uniqueDoctorCount} unique doctors represented`}
-                tone="blue"
-                icon={Stethoscope}
-              />
-              <Metric
-                label="Contacted records"
-                value={String(metrics.contactedCount)}
-                detail={`${metrics.enrolledCount} enrolled records`}
-                tone="mint"
-                icon={Activity}
-              />
-              <Metric
-                label="Converted records"
-                value={String(metrics.convertedCount)}
-                detail={`${metrics.lostCount} lost records`}
-                tone="amber"
-                icon={Target}
-              />
-              <Metric
-                label="Conversion rate"
-                value={formatPercent(metrics.conversionRate)}
-                detail={`${metrics.convertedCount} converted / ${metrics.eligibleRecordCount} eligible records`}
-                tone="red"
-                icon={BarChart3}
-              />
+            <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <Metric label="Total records" value={String(metrics.recordCount)} detail={`${metrics.uniqueDoctorCount} unique doctors represented`} tone="blue" icon={Stethoscope} />
+              <Metric label="Prospects" value={String(metrics.prospectsCount)} detail="Records with prospect status" tone="amber" icon={CircleDot} />
+              <Metric label="Contacted" value={String(metrics.contactedCount)} detail={`${formatPercent(metrics.contactRate)} of records`} tone="purple" icon={Activity} />
+              <Metric label="Enrolled" value={String(metrics.enrolledCount)} detail={`${formatPercent(metrics.enrollmentRate)} of records`} tone="mint" icon={CheckCircle2} />
+              <Metric label="Converted" value={String(metrics.convertedCount)} detail={`${formatPercent(metrics.conversionRate)} of records`} tone="mint" icon={Target} />
+              <Metric label="Lost" value={String(metrics.lostCount)} detail={`${formatPercent(metrics.lostRate)} of records`} tone="red" icon={AlertTriangle} />
             </div>
 
-            <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6">
-                <div className="flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-lg bg-[#eaf3ff] text-[#4a87c9]">
-                    <BarChart3 size={16} />
-                  </span>
-                  <h2 className="font-display text-[16px] font-bold text-[#152239]">
-                    Pipeline status
-                  </h2>
-                </div>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Actual `doctor_acquisition.status` values returned by the
-                  organisation.
-                </p>
-                <div className="mt-4">
-                  <BreakdownList rows={metrics.statuses} />
-                </div>
-              </section>
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6">
-                <div className="flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-lg bg-[#fff2d9] text-[#b3781f]">
-                    <Target size={16} />
-                  </span>
-                  <h2 className="font-display text-[16px] font-bold text-[#152239]">
-                    Acquisition channels
-                  </h2>
-                </div>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Grouped from the actual acquisition channel field.
-                </p>
-                <div className="mt-4">
-                  <BreakdownList rows={metrics.channels} />
-                </div>
-              </section>
+            <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+              <Section title="Acquisition channels" description="Actual channel values with milestone counts and conversion rates. No channel is ranked as best or worst." icon={BarChart3}>
+                <ChannelTable channels={metrics.channels} />
+              </Section>
+              <Section title="Pipeline status" description="Actual doctor_acquisition.status values returned by the organisation." icon={CircleDot}>
+                <BreakdownList rows={metrics.statuses} />
+              </Section>
             </div>
 
             <div className="mt-5 grid gap-5 lg:grid-cols-3">
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6">
-                <div className="flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-lg bg-[#e8f8f2] text-[#1b9975]">
-                    <Users size={16} />
-                  </span>
-                  <h2 className="font-display text-[16px] font-bold text-[#152239]">
-                    Owner workload
-                  </h2>
+              <Section title="Owner workload" description="Acquisition records grouped by their existing owner_employee_id relationship." icon={Users}>
+                <div className="space-y-2">
+                  {metrics.ownerWorkload.length ? metrics.ownerWorkload.slice(0, 8).map((owner) => <OwnerCard key={owner.id ?? "unassigned"} owner={owner} />) : <StateMessage>No owner workload is available.</StateMessage>}
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Acquisition records grouped by assigned owner.
-                </p>
-                <div className="mt-4 space-y-2">
-                  {metrics.ownerWorkload.length ? (
-                    metrics.ownerWorkload.slice(0, 6).map((owner) => (
-                      <div
-                        key={owner.id ?? "unassigned"}
-                        className="rounded-xl bg-[#f7f9fb] p-3"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-[11px] font-bold text-slate-700">
-                              {owner.name}
-                            </p>
-                            <p className="mt-1 truncate text-[10px] text-slate-400">
-                              {owner.jobTitle || "Acquisition owner"}
-                            </p>
-                          </div>
-                          <span className="font-display text-[19px] font-bold text-[#152239]">
-                            {owner.count}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-[10px] text-slate-400">
-                          {owner.statuses
-                            .map((status) => `${status.label}: ${status.count}`)
-                            .join(" · ")}
-                        </p>
-                      </div>
-                    ))
-                  ) : (
-                    <StateMessage>No owner workload is available.</StateMessage>
-                  )}
-                </div>
-              </section>
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6">
-                <div className="flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-lg bg-[#f1edff] text-[#755bc0]">
-                    <MapPin size={16} />
-                  </span>
-                  <h2 className="font-display text-[16px] font-bold text-[#152239]">
-                    Practice context
-                  </h2>
-                </div>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Recorded city or province from related doctor profiles.
-                </p>
-                <div className="mt-4">
-                  <GeographyList records={data.acquisitions} />
-                </div>
-              </section>
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6">
-                <div className="flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-lg bg-[#fff2d9] text-[#b3781f]">
-                    <CalendarDays size={16} />
-                  </span>
-                  <h2 className="font-display text-[16px] font-bold text-[#152239]">
-                    First-1000 campaign
-                  </h2>
-                </div>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Descriptive campaign flags from related doctor profiles.
-                </p>
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between rounded-xl bg-[#f7f9fb] px-3 py-3">
-                    <span className="text-[11px] text-slate-500">
-                      Marked campaign doctors
-                    </span>
-                    <strong className="font-display text-[21px] text-[#152239]">
-                      {metrics.first1000DoctorCount}
-                    </strong>
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl bg-[#f7f9fb] px-3 py-3">
-                    <span className="text-[11px] text-slate-500">
-                      Not marked
-                    </span>
-                    <strong className="font-display text-[21px] text-[#152239]">
-                      {metrics.nonFirst1000DoctorCount}
-                    </strong>
-                  </div>
-                </div>
-              </section>
+              </Section>
+              <Section title="First-1000 campaign" description="Factual campaign flags from related doctors. No target is invented." icon={CalendarDays}>
+                <CampaignSummary total={metrics.first1000DoctorCount} active={metrics.first1000ActiveDoctorCount} acquisitions={metrics.first1000AcquisitionCount} enrolled={metrics.first1000EnrolledCount} converted={metrics.first1000ConvertedCount} notMarked={metrics.nonFirst1000DoctorCount} />
+              </Section>
+              <Section title="Source detail" description="Recorded source_detail values, including a display fallback for missing values." icon={MapPin}>
+                <BreakdownList rows={metrics.sourceDetails} />
+              </Section>
             </div>
 
-            <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="grid size-8 place-items-center rounded-lg bg-[#eaf3ff] text-[#4a87c9]">
-                        <Stethoscope size={16} />
-                      </span>
-                      <h2 className="font-display text-[16px] font-bold text-[#152239]">
-                        Recent acquisition activity
-                      </h2>
-                    </div>
-                    <p className="mt-2 text-[11px] text-slate-400">
-                      Latest records sorted by their actual created timestamp.
-                    </p>
+            <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <Section title="Doctor and acquisition records" description="Recent records with doctor context, contact details, source, owner and campaign status." icon={Stethoscope}>
+                {recentRecords.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[960px] text-left text-[10px]">
+                      <thead className="text-[9px] uppercase tracking-[0.12em] text-slate-400">
+                        <tr><th className="pb-2 font-bold">Doctor</th><th className="pb-2 font-bold">Practice context</th><th className="pb-2 font-bold">Source</th><th className="pb-2 font-bold">Owner</th><th className="pb-2 font-bold">Status</th><th className="pb-2 text-right font-bold">Updated</th></tr>
+                      </thead>
+                      <tbody>{recentRecords.slice(0, 12).map((record) => <DoctorRow key={record.id} record={record} />)}</tbody>
+                    </table>
                   </div>
-                  <span className="rounded-full bg-[#eaf3ff] px-2.5 py-1 text-[10px] font-bold text-[#4a87c9]">
-                    {metrics.recordCount}
-                  </span>
+                ) : <StateMessage>No doctor acquisition records yet.</StateMessage>}
+              </Section>
+              <Section title="Acquisition timeline" description="Chronological events derived only from stored acquisition timestamps." icon={Clock3}>
+                {timeline.length ? timeline.slice(0, 10).map((item) => <TimelineRow key={item.id} item={item} />) : <StateMessage>No stored acquisition timestamps are available.</StateMessage>}
+              </Section>
+            </div>
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <Section title="Operational follow-up" description="Tasks and tickets matched through existing department or assigned-owner relationships; no acquisition foreign key is assumed." icon={Ticket}>
+                {tasksUnavailable || ticketsUnavailable ? (
+                  <StateMessage tone="warning">{tasksUnavailable ? "Task data is unavailable." : ""}{tasksUnavailable && ticketsUnavailable ? " " : ""}{ticketsUnavailable ? "Ticket data is unavailable." : ""}</StateMessage>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl bg-[#f7f9fb] p-3"><p className="text-[10px] text-slate-400">Related tasks</p><strong className="mt-1 block font-display text-[24px] text-[#152239]">{operations.relatedTaskCount}</strong><p className="mt-1 text-[10px] text-slate-400">{operations.openTaskCount} open · {operations.overdueTaskCount} overdue</p></div>
+                    <div className="rounded-xl bg-[#f7f9fb] p-3"><p className="text-[10px] text-slate-400">Related tickets</p><strong className="mt-1 block font-display text-[24px] text-[#152239]">{operations.relatedTicketCount}</strong><p className="mt-1 text-[10px] text-slate-400">{operations.openTicketCount} open · {operations.overdueTicketCount} overdue</p></div>
+                    <div className="sm:col-span-2 space-y-2">
+                      {[...(data.tasks.filter((task) => !isResolvedStatus(task.status)).map((task) => ({ id: task.id, title: task.title, status: task.status, due: task.due_date, kind: "Task" }))), ...(data.tickets.filter((ticket) => !isResolvedStatus(ticket.status)).map((ticket) => ({ id: ticket.id, title: ticket.title, status: ticket.status, due: ticket.due_date, kind: "Ticket" })))]
+                        .slice(0, 6)
+                        .map((item) => <div key={`${item.kind}-${item.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5"><div className="min-w-0"><p className="truncate text-[11px] font-semibold text-slate-600">{item.title}</p><p className="mt-1 text-[10px] text-slate-400">{item.kind} · due {formatLiveDate(item.due)}</p></div><span className={cn("shrink-0 rounded-full px-2 py-1 text-[9px] font-bold", statusClass(item.status))}>{item.status}</span></div>)}
+                      {!data.tasks.some((task) => !isResolvedStatus(task.status)) && !data.tickets.some((ticket) => !isResolvedStatus(ticket.status)) && <StateMessage>No open related tasks or tickets.</StateMessage>}
+                    </div>
+                  </div>
+                )}
+              </Section>
+              <Section title="KPI information" description="Existing organisation KPIs with relationship-scoped periods, targets and results. Missing values are not converted to zero." icon={Target}>
+                {kpisUnavailable ? <StateMessage tone="warning">KPI data is unavailable.</StateMessage> : kpiInformation.length ? <div className="space-y-2">{kpiInformation.slice(0, 6).map((information) => <KpiRow key={information.kpi.id} information={information} />)}</div> : <StateMessage>No organisation KPI information is available.</StateMessage>}
+              </Section>
+            </div>
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <Section title="Active company alerts" description="Existing active alerts visible to the authenticated organisation." icon={AlertTriangle}>
+                {alertsUnavailable ? <StateMessage tone="warning">Company alert data is unavailable.</StateMessage> : data.alerts.length ? <div className="space-y-2">{data.alerts.slice(0, 6).map((alert) => <div key={alert.id} className="rounded-xl border border-slate-100 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-bold text-slate-700">{alert.title}</p><p className="mt-1 text-[10px] leading-5 text-slate-500">{alert.message}</p></div><span className={cn("shrink-0 rounded-full px-2 py-1 text-[9px] font-bold", statusClass(alert.severity))}>{alert.severity}</span></div><p className="mt-2 text-[9px] text-slate-400">{formatLiveDate(alert.starts_at)} · {alert.status}</p></div>)}</div> : <StateMessage>No active company alerts.</StateMessage>}
+              </Section>
+              <Section title="Source and scope" description="How this command centre relates to the existing security model." icon={CheckCircle2}>
+                <div className="space-y-2 text-[11px] leading-5 text-slate-500">
+                  <p className="rounded-xl bg-[#f7f9fb] p-3">Acquisition records are selected without an organization_id filter because that column does not exist. Supabase RLS scopes them through doctor_acquisition.doctor_id → doctors.organization_id.</p>
+                  <p className="rounded-xl bg-[#f7f9fb] p-3">Doctors, employees, departments, tasks, tickets, KPIs, periods and alerts are selected with the authenticated organisation context. KPI targets and results are filtered only through their KPI and period relationships.</p>
+                  <p className="rounded-xl bg-[#f7f9fb] p-3">This page is read-only. It does not create, update or delete acquisition, doctor, task, ticket, alert or KPI records.</p>
                 </div>
-                <div className="mt-4 space-y-2">
-                  {recentRecords.length ? (
-                    recentRecords
-                      .slice(0, 8)
-                      .map((record) => (
-                        <ActivityRow key={record.id} record={record} />
-                      ))
-                  ) : (
-                    <StateMessage>
-                      No doctor acquisition records yet.
-                    </StateMessage>
-                  )}
-                </div>
-              </section>
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6">
-                <div className="flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-lg bg-[#f1edff] text-[#755bc0]">
-                    <Target size={16} />
-                  </span>
-                  <h2 className="font-display text-[16px] font-bold text-[#152239]">
-                    Source detail
-                  </h2>
-                </div>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Recorded source detail values, including unspecified records.
-                </p>
-                <div className="mt-4">
-                  <BreakdownList rows={metrics.sourceDetails} />
-                </div>
-              </section>
+              </Section>
             </div>
           </>
         )}

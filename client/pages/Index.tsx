@@ -16,7 +16,10 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/medmap/AppShell";
 import { cn } from "@/lib/utils";
-import { useCurrentOrganisation } from "@/lib/supabase-identity";
+import {
+  useCurrentOrganisation,
+  type OrganizationRecord,
+} from "@/lib/supabase-identity";
 import {
   buildFinanceSummary,
   buildKpiRows,
@@ -131,7 +134,7 @@ function MetricCard({ metric }: { metric: Metric }) {
   );
 }
 
-function formatOrganisationName(organization: Record<string, unknown> | null) {
+function formatOrganisationName(organization: OrganizationRecord | null) {
   const name = organization?.name;
   return typeof name === "string" && name.trim()
     ? name
