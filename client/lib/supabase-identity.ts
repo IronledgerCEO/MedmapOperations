@@ -92,15 +92,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function parseOrganizationRecord(value: unknown, organizationId: string): OrganizationRecord {
   if (!isRecord(value)) throw new Error("The organisation record is not an object.");
   const id = value.id;
-  const name = value.name;
   if (typeof id !== "string" || id !== organizationId) {
     throw new Error("The organisation record ID does not match the resolved organisation.");
   }
-  if (name === null) return { id, name: null };
-  if (typeof name !== "string") {
-    throw new Error("The organisation name has an invalid type.");
-  }
-  return { id, name };
+  return { id, name: null };
 }
 
 export function useCurrentEmployee(): CurrentEmployeeState {
@@ -223,14 +218,14 @@ export function useCurrentOrganisation(): CurrentOrganisationState {
 
       const { data, error } = await client
         .from("organizations")
-        .select("id, name")
+        .select("id")
         .eq("id", organizationId)
         .maybeSingle();
 
       if (error) throw error;
       if (!data) return null;
-      const record = parseOrganizationRecord(data, organizationId);
-      return { id: record.id, record };
+      parseOrganizationRecord(data, organizationId);
+      return { id: data.id, record: { id: data.id, name: null } };
     },
   });
 
