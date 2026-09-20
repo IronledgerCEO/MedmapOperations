@@ -10,6 +10,7 @@ import {
   ChevronDown,
   FileText,
   Gauge,
+  GitBranch,
   LayoutDashboard,
   LifeBuoy,
   Menu,
@@ -65,6 +66,9 @@ const navItems = [
     icon: LifeBuoy,
     path: "/customer-operations",
   },
+  { label: "Product", section: "product", icon: Boxes, path: "/product" },
+  { label: "Engineering", section: "engineering", icon: GitBranch, path: "/engineering" },
+  { label: "Security", section: "security", icon: ShieldCheck, path: "/security" },
   { label: "People & goals", section: "people", icon: Users, path: "/people" },
   {
     label: "Meetings & deadlines",
@@ -138,7 +142,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       ? "Sales"
                       : location.pathname === "/customer-operations"
                         ? "Customer Operations"
-                        : location.pathname === "/technology"
+                        : location.pathname === "/product"
+                          ? "Product"
+                          : location.pathname === "/engineering"
+                            ? "Engineering"
+                            : location.pathname === "/security"
+                              ? "Security"
+                              : location.pathname === "/technology"
                           ? "Technology"
                           : location.pathname === "/risk"
                             ? "Risk & governance"

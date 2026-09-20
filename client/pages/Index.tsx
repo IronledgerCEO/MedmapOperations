@@ -769,6 +769,23 @@ export default function Index() {
           </RecordState>
         </section>
 
+        <section className="mt-5 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(21,36,58,0.035)] sm:p-6">
+          <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="grid size-8 place-items-center rounded-lg bg-[#eaf3ff] text-[#4a87c9]"><Layers3 size={16} /></span>
+                <h2 className="font-display text-[16px] font-bold text-[#152239]">Technology delivery and security</h2>
+              </div>
+              <p className="mt-2 text-[11px] leading-5 text-slate-400">Open the live Product, Engineering and Security command centres for detailed operational records.</p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <Link to="/product" className="rounded-xl border border-slate-100 bg-[#f7f9fb] p-4 transition hover:border-[#bfe9da] hover:bg-[#f2fcf8]"><p className="text-[11px] font-bold text-slate-700">Product</p><p className="mt-1 text-[10px] leading-5 text-slate-400">Roadmaps, backlog, releases and feedback.</p><span className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold text-[#1c9574]">Open Product <ChevronRight size={13} /></span></Link>
+            <Link to="/engineering" className="rounded-xl border border-slate-100 bg-[#f7f9fb] p-4 transition hover:border-[#bfe9da] hover:bg-[#f2fcf8]"><p className="text-[11px] font-bold text-slate-700">Engineering</p><p className="mt-1 text-[10px] leading-5 text-slate-400">Projects, operational links and deployments.</p><span className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold text-[#1c9574]">Open Engineering <ChevronRight size={13} /></span></Link>
+            <Link to="/security" className="rounded-xl border border-slate-100 bg-[#f7f9fb] p-4 transition hover:border-[#bfe9da] hover:bg-[#f2fcf8]"><p className="text-[11px] font-bold text-slate-700">Security</p><p className="mt-1 text-[10px] leading-5 text-slate-400">Controls, tests, findings and remediation.</p><span className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold text-[#1c9574]">Open Security <ChevronRight size={13} /></span></Link>
+          </div>
+        </section>
+
         <footer className="mt-8 flex flex-col justify-between gap-2 border-t border-slate-200/70 pt-5 text-[10px] text-slate-400 sm:flex-row">
           <span>MedMap Operating System · Supabase-backed command centre</span>
           <span>Live data → Evidence → Status → Action</span>

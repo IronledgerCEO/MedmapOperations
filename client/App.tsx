@@ -21,6 +21,9 @@ import Meetings from "./pages/Meetings";
 import KPIs from "./pages/KPIs";
 import ModulePage from "./pages/ModulePage";
 import NotFound from "./pages/NotFound";
+import Product from "./pages/Product";
+import Engineering from "./pages/Engineering";
+import Security from "./pages/Security";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +57,9 @@ const App = () => (
                   path="/customer-operations"
                   element={<CustomerOperations />}
                 />
+                <Route path="/product" element={<Product />} />
+                <Route path="/engineering" element={<Engineering />} />
+                <Route path="/security" element={<Security />} />
                 <Route
                   path="/technology"
                   element={<ModulePage module="technology" />}
